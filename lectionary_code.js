@@ -89,7 +89,6 @@ function writeHtmlToDocument(fileId, field, htmlString) {
   // Attempt to parse:
   try {
     var text = XmlService.parse(htmlString).getRootElement().getValue();
-    // Logger.log(text);
     writeToDocument(fileId, field, text);
   } catch(e) {
     Logger.log(e);
