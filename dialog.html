@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Lectionary Lookup</title>
+ 
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons.css">
+    <script>
+      // Global variable bulletinData is an object to contain all data needed to perform the 
+      // copy-and-replace action in the app script.
+      var bulletinData = {};
+      // Make a global variable that indicates the template files and the target files.
+      var targetFiles = {};
+      // docList will be populated from the picker.  Declare it global here so it can be accessed by all functions.
+      var docList = {};
+    
+      // IMPORTANT: Replace the value for DEVELOPER_KEY with the API key obtained
+      // from the Google Developers Console.
+      var DEVELOPER_KEY = 'AIzaSyBYDmi3LNMKUR47jJkCVADIKM4MkyCszck';
+      var DIALOG_DIMENSIONS = {width: 600, height: 425};
+      var pickerApiLoaded = false;
+    
+      /**
+      * Loads the Google Picker API.
+      */
+      function onApiLoad() {
+        gapi.load('picker', {'callback': function() {
+          pickerApiLoaded = true;
+          // Un-comment here to auto-load picker:
+          //getOAuthToken();
+        }});
+      }
+    
+      /**
+      * Gets the user's OAuth 2.0 access token from the server-side script so that
+      * it can be passed to Picker. This technique keeps Picker from needing to
+      * show its own authorization dialog, but is only possible if the OAuth scope
+      * that Picker needs is available in Apps Script. Otherwise, your Picker code
+      * will need to declare its own OAuth scopes.
+      */
+      function getOAuthToken() {
+        google.script.run.withSuccessHandler(createPicker)
+          .withFailureHandler(showError).getOAuthToken();
+      }
+    
+      /**
+      * Creates a Picker that can access the user's spreadsheets. This function
+      * uses advanced options to hide the Picker's left navigation panel and
+      * default title bar.
+      *
+      * @param {string} token An OAuth 2.0 access token that lets Picker access the
+      *     file type specified in the addView call.
+      */
+      function createPicker(token) {
+        if (pickerApiLoaded && token) {
+          var picker = new google.picker.PickerBuilder()
+            // Instruct Picker to display only spreadsheets in Drive. For other
+            // views, see https://developers.google.com/picker/docs/#otherviews
+            .addView(google.picker.ViewId.DOCUMENTS)
+            // Hide the navigation panel so that Picker fills more of the dialog.
+            .enableFeature(google.picker.Feature.NAV_HIDDEN)
+            // Hide the title bar since an Apps Script dialog already has a title.
+            .hideTitleBar()
+            // Allow up to 6 files to be chosen.
+            .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+            .setMaxItems(6)
+            .setOAuthToken(token)
+            .setDeveloperKey(DEVELOPER_KEY)
+            .setCallback(pickerCallback)
+            .setOrigin(google.script.host.origin)
+            // Instruct Picker to fill the dialog, minus 2 pixels for the border.
+            .setSize(DIALOG_DIMENSIONS.width - 2,
+            DIALOG_DIMENSIONS.height - 2)
+            .build();
+            picker.setVisible(true);
+        } else {
+          showError('Unable to load the file picker.');
+        }
+      }
+      
+      /**
+      * A callback function that extracts the chosen document's metadata from the
+      * response object. For details on the response object, see
+      * https://developers.google.com/picker/docs/result
+      *
+      * @param {object} data The response object.
+      */
+      function pickerCallback(data) {
+        var action = data[google.picker.Response.ACTION];
+        if (action == google.picker.Action.PICKED) {
+          docList = data[google.picker.Response.DOCUMENTS];
+          var numDocs = docList.length;
+          document.getElementById('pickerResult').innerHTML =
+          'Please indicate the filename for saving each template:';
+          for (var i=0; i<numDocs; i++) {
+            var templateId = 'template' + i;
+            document.getElementById(templateId).innerHTML = 
+            docList[i][google.picker.Document.NAME];
+            document.getElementById('file-namer'+i).style.display = "block";
+          }
+          var elementsToShow = document.getElementsByClassName("show-on-pick-files");
+          for (var i=0; i<elementsToShow.length; i++) {
+            elementsToShow[i].style.display = "block";
+          }
+        } else if (action == google.picker.Action.CANCEL) {
+          document.getElementById('pickerResult').innerHTML = 'No file selected.';
+        }
+      }
+      
+      /**
+      * Displays an error message within the #result element.
+      *
+      * @param {string} message The error message to display.
+      */
+      function showError(message) {
+        document.getElementById('pickerResult').innerHTML = 'Error: ' + message;
+      }
+      
+      
+      function getReadings() {
+        // bulletinData was established above as a global variable.
+        bulletinData.fields = {};
+        // Get text of the collect of the day.
+        var collectArray = document.getElementsByClassName("collectText");
+        bulletinData.fields['collect-text'] = collectArray[0].innerHTML;
+        // Get title of the Sunday (e.g. Sixth Sunday in Easter)
+        var sundayTitleArray = document.getElementsByClassName("sundayTitle");
+        bulletinData.fields['sunday-title'] = sundayTitleArray[0].innerHTML;
+        // Get the heading, citation, and text for each reading.
+        var lessons = ['ot','ps','nt','gsp'];
+     
+        for (var i = 0; i < lessons.length; i++) {
+          var lessonCode = lessons[i];
+          var lessonNumber = document.getElementById(lessonCode + "-select").value;
+          
+          var elementId = lessonCode + lessonNumber;
+         
+          var element = document.getElementById(elementId);
+           
+          if (element.className == "lessonCitation") {
+            // For alternate readings within the same track, the id for the second option is in the lessonCitation element,
+            // and the heading is somewhere up above the first option.  The whole thing is wrapped in an article tag, and
+            // the heading is the first child of the article.
+            var heading = element.parentNode.firstChild.innerHTML;
+            var citationElement = element;
+          } else { // Otherwise, current element is the lesson heading, and the citation follows thereafter.
+            var heading = element.innerHTML;
+            var citationElement = element.nextElementSibling;
+          }
+          bulletinData.fields[lessonCode + '-heading'] = heading;
+          var citation = citationElement.innerHTML;
+          bulletinData.fields[lessonCode + '-citation'] = citation;
+          if (lessonCode == 'gsp') {
+            // Get the name of the evangelist, i.e. book name of gospel citation.
+            bulletinData.fields['gsp-evangelist'] = citation.split(' ',1)[0];
+          }
+          var textElement = citationElement.nextElementSibling;
+          if (lessonCode == 'ps') {
+            // The psalm has an extra sibling, the latin header.
+            var latin = textElement.innerHTML;
+            bulletinData.fields[lessonCode + '-latin'] = latin;
+            textElement = textElement.nextElementSibling;
+          }
+          var text = textElement.innerHTML;
+          bulletinData.fields[lessonCode + '-text'] = text;
+          
+        }
+        copyAndInsert();
+      }
+      
+      function copyAndInsert() {
+        document.getElementById('copyResult').innerHTML = "<p>Working...</p>";
+        var numDocs = docList.length;
+        for (var i=0; i<numDocs; i++) {
+          var templateFileId = docList[i][google.picker.Document.ID];
+          var targetFileName = document.getElementById('fileName'+i).value;
+          targetFiles[templateFileId] = targetFileName;
+          bulletinData['targetFiles'] = targetFiles;
+        }
+        google.script.run
+          .withSuccessHandler(copiedWithSuccess)
+          .withFailureHandler(copiedWithFailure)
+          .copyDocAndWriteReadings(bulletinData);
+      }
+      
+      function copiedWithSuccess(newDocuments) {
+        var success = "<p>Success! New documents were created with readings inserted.</p>";
+        success += "<p>Click here to open the new documents:</p>";
+        for (var i=0; i<newDocuments.length; i++) {
+          var newDocument = newDocuments[i];
+          success += "<p><a href='" + newDocument.url + "'>" + newDocument.name + "</a></p>";
+        }
+        document.getElementById('copyResult').innerHTML = success;
+      }
+      
+      function copiedWithFailure(newDocuments) {
+        document.getElementById('copyResult').innerHTML = "<p>Something went wrong.  You might need to try again.</p>";
+      }
+      
+      // Check if there is more than one reading, e.g. ot1 and ot2; if so, allow user to choose which one.
+      function chooseAlternateReadings() {
+        var lessons = ['ot','ps','nt','gsp'];
+        for (var i = 0; i < lessons.length; i++) {
+          var lessonCode = lessons[i];
+          var lessonNumber = 1;
+          var lessonElement =  document.getElementById(lessonCode + String(lessonNumber));
+          while (lessonElement != null) {
+            // Citations are always tagged h3.  If there are alternates, sometimes the id is attached to the header (The Psalm);
+            // sometimes it's attached directly to the citation (Psalm 30). Check whether the current element is an h3 so we
+            // know which has the citation.
+            var citation = (lessonElement.tagName == "H3") ? lessonElement.innerHTML : lessonElement.nextElementSibling.innerHTML;
+            optionHTML = "<option value='" + lessonNumber + "' >" + citation + "</option>";
+            var selectElement = document.getElementById(lessonCode + "-select");
+            selectElement.innerHTML += optionHTML;
+            lessonNumber++;
+            lessonElement =  document.getElementById(lessonCode + String(lessonNumber));
+          }
+          
+        }
+        
+        
+        
+      }
+      
+      function writeHtmlOutput(html) {
+        // Load html of lectionary readings into current dialog (hidden) and into sidebar for preview.
+        document.getElementById('mOutput').innerHTML = html;
+        google.script.run.showInSidebar(html,"Preview of readings");
+        // Allow user to choose among alternate readings.
+        chooseAlternateReadings();
+        // Show hidden elements to prepare for next step.
+        var elementsToShow = document.getElementsByClassName("show-on-fetch-readings");
+        for (var i=0; i<elementsToShow.length; i++) {
+          elementsToShow[i].style.display = "block";
+        }
+        
+      }
+      
+      // Pass the URL typed by the user to the script, which will extract the HTML from it.
+      function getLectionaryHTML() {
+        var url = document.getElementById('lectionaryUrl').value;
+        // If no URL was entered, give up:
+        if (url == "") {
+          return;
+        }
+        try {
+          google.script.run.withSuccessHandler(writeHtmlOutput).getUrlData(url);
+        } catch(e) {
+          Logger.log(e);
+        }
+      }
+      
+      function extractHtml() {
+        bulletinData.newFileName = document.getElementById("fileName").value;
+        google.script.run.copyDocAndWriteReadings(bulletinData);
+      }
+  </script>
+  </head>
+  <body>
+    <p>Copy and paste the URL for the readings, from <a href = "http://www.lectionarypage.net" target="new">lectionarypage.net:</a></p>
+    <p><input id="lectionaryUrl" type="text" size="30"/></p>
+    <input id="getUrlButton" type="button" value="Look up and preview readings" onclick="getLectionaryHTML()" /><br/>
+    <div id="chooseAlternateReadings" class="show-on-fetch-readings" style="display:none;">
+    <ul>
+        <li><label for="ot-select">First Lesson: </label><select id="ot-select"></select></li>
+        <li><label for="ps-select">Psalm: </label><select id="ps-select"></select></li>
+        <li><label for="nt-select">Second Lesson: </label><select id="nt-select"></select></li>
+        <li><label for="gsp-select">Gospel: </label><select id="gsp-select"></select></li>
+      </ul>
+    </div>
+    <div id="lookupResult" class="show-on-fetch-readings" style="display:none;"></div>
+    <p class="show-on-fetch-readings" style="display:none;">Click here to choose a template file:</p>
+    <p><input id="templatePicker" class="show-on-fetch-readings" type="button" value="Choose template files..." 
+    onclick="getOAuthToken()" style="display:none;"/></p>
+    
+    <div>
+    <b><p id="pickerResult"></p></b>
+    <div id="filename-form" class="show-on-pick-files" style="display:none;">
+      <p id="file-namer0" style="display:none;"><span id='template0'></span> -> <input id="fileName0" type="text" size="30"/></p>
+      <p id="file-namer1" style="display:none;"><span id='template1'></span> -> <input id="fileName1" type="text" size="30"/></p>
+      <p id="file-namer2" style="display:none;"><span id='template2'></span> -> <input id="fileName2" type="text" size="30"/></p>
+      <p id="file-namer3" style="display:none;"><span id='template3'></span> -> <input id="fileName3" type="text" size="30"/></p>
+      <p id="file-namer4" style="display:none;"><span id='template4'></span> -> <input id="fileName4" type="text" size="30"/></p>
+      <p id="file-namer5" style="display:none;"><span id='template5'></span> -> <input id="fileName5" type="text" size="30"/></p>
+    </div>
+    <p><input id="createBulletins" class="show-on-pick-files" type="button" value="Create bulletins" 
+       onclick="getReadings()" style="display:none;"/></p>
+    <div id="copyResult"></div>
+  </div>
+  <div><br/><p><input type="button" value="Close window" 
+       onclick="google.script.host.close()"/></p></div>
+  
+  <div id="mOutput" hidden></div>
+  <script src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
+  </body>
+ 
+</html>
+
+
