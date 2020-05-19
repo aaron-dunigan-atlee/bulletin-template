@@ -1,0 +1,57 @@
+<script>
+  $( document ).ready(function() {
+    var calendarMonthSelect = $('#calendar-month-select');
+    setFeastDaySelectOptions(calendarMonthSelect.val())
+    calendarMonthSelect.change(function(){
+      setFeastDaySelectOptions($(this).val());
+      $('#feast-day-select').change()
+    })
+
+    var feastDaySelect = $('#feast-day-select');
+    getLectionaryHTML(feastDaySelect.val())
+    feastDaySelect.change(function(){getLectionaryHTML($(this).val())})
+
+    $('#drive-button').click(function () {
+        google.script.run
+          .withSuccessHandler(onPickerResult)
+          .withFailureHandler(failureHandler)
+          .showTemplatePicker();
+    });
+});
+
+function setFeastDaySelectOptions(month) {
+  var calendar = JSON.parse(<?= JSON.stringify(context.calendar) ?>)
+  var options = ''
+  var days = calendar[month]
+  for (var i=0; i<days.length; i++) {
+    var day = days[i]
+    options += '<option value="' + day.url + '">' + day.day + ' ' + day.feast + '</option>'
+  }
+  $('#feast-day-select').html(options)
+}
+
+
+// result =  {id: , name: }.  If no file picked, name = 'No file selected.' and id = ''
+function onPickerResult(result) {
+  result = JSON.parse(result)
+  // console.log("onPickerResult: Got result " + result)
+  //hideLoadingSign();
+  $('#template-name').val(result.name);
+  $('#template-id').val(result.id)
+}
+
+  loadingSign = '' +
+      '<div id="loading-sign-container" class="d-flex align-items-center justify-content-center" style="position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 9999">' +
+      '<div id="loading-sign-spinner" class="spinner-border " role="status"></div>' +
+      '</div>';
+
+  function showLoadingSign(color = 'green', backgroundColor = 'rgba(0,0,0,.7)') {
+      $('body').append(loadingSign);
+      $('#loading-sign-container').css('background-color', backgroundColor);
+      $('#loading-sign-spinner').css('color', color);
+  }
+
+  function hideLoadingSign() {
+      $('#loading-sign-container').remove();
+  }
+</script>

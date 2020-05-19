@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <base target="_blank">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons.css">
+    <?!= include('sidebar-css') ?>
+    
+</head>
+<body>
+  <div class="container">
+  <div class="row">
+    <div class="col">
+
+      <div class="row">
+        <div class="col">
+          <div class="block form-group">
+            <label for="calendar-month-select">Choose a month:</label>
+            <select id="calendar-month-select">
+              <? for (var month in context.calendar) {?>
+                <option value="<?=month?>"><?=month?></option>
+              <?}?>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      
+      <div class="row">
+        <div class="col">
+          <div class="block form-group">
+            <label for="feast-day-select">Choose a day:</label>
+            <select id="feast-day-select">
+              
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <div id="chooseAlternateReadings" class="block form-group show-on-fetch-readings">
+            <ul>
+                <li><label for="ot-select">First Lesson: </label><select id="ot-select"></select></li>
+                <li><label for="ps-select">Psalm: </label><select id="ps-select"></select></li>
+                <li><label for="nt-select">Second Lesson: </label><select id="nt-select"></select></li>
+                <li><label for="gsp-select">Gospel: </label><select id="gsp-select"></select></li>
+              </ul>
+            </div>
+        </div>
+      </div>
+
+     
+
+    <div>
+        <button id="drive-button">
+            <img class="drive-button-logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Google_Drive_logo.png/1200px-Google_Drive_logo.png" alt="Drive Icon"> Choose Template
+        </button>
+    </div>
+
+    <div>
+      <input type="text" id="template-name" value="No file selected." readonly>
+      <input type="hidden" id="template-id" value="">
+      <label for="bulletin-file-name">Enter a file name for your bulletin:</label>
+      <input type="text" id="bulletin-file-name">
+    </div>
+      
+
+      <div class="row">
+        <div class="col">
+          <label for="data-sheet-select">Choose the sheet with your data:</label>
+          <select id="data-sheet-select">
+            <? for (var i=0; i<context.dataSheetNames.length; i++) {?>
+              <option value="<?=context.dataSheetNames[i]?>"><?=context.dataSheetNames[i]?></option>
+            <?}?>
+          </select>
+        </div>
+      </div>
+
+      <p>
+        <input id="createBulletins" type="button" value="Create bulletin" onclick="submitForm()"/>
+      </p>
+      <div id="copyResult"></div>
+    </div>
+    
+    <div id="mOutput" hidden></div>
+    </div>
+  </div>
+</div>
+  <script src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+  <?!= include('sidebar-js') ?>
+  <?!= include('sidebar2-js', context) ?>
+  
+</body>
+</html>
+
+

@@ -1,24 +1,5 @@
 // Some of the html functionality, and the lectionary.html, were adapted from 
 // https://stackoverflow.com/questions/33561079/parse-html-using-google-app-script
-function onOpen() {
- var ui = SpreadsheetApp.getUi();
-    ui.createMenu("Bulletins")
-      .addItem("Insert Readings and Custom Fields", "showDialog")
-      .addToUi();
-}
-
-// Show a sidebar with the given html.
-function showInSidebar(html,title) {
-  var sideBar = HtmlService.createHtmlOutput(html)
-                           .setTitle(title);
-  SpreadsheetApp.getUi().showSidebar(sideBar);
-}
-
-// Open a dialog that allows the user to set all options for the bulletins.
-function showDialog() {
-  var dialog = HtmlService.createHtmlOutputFromFile("dialog");
-  SpreadsheetApp.getUi().showModelessDialog(dialog, 'Bulletin Creation');
-}
 
 // Fetch the html content of the lectionary website for the given Sunday.
 function getUrlData(url) {
@@ -98,3 +79,27 @@ function writeHtmlToDocument(fileId, field, htmlString) {
   
 }
 
+// Return an object variable containing all of the fields in the spreadsheet that will be filled in the document template.
+function addCustomFields(bulletinData) {
+  
+  var customFieldSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var values = customFieldSpreadsheet.getSheetByName(bulletinData.dataSheetName).getDataRange().getValues();
+  for (var i=1; i<values.length; i++) // Start at 1 because first row (index 0) is header.
+  {
+    bulletinData.fields[values[i][0]] = values[i][1];
+  }
+  return bulletinData;
+}
+
+
+/**
+ * Get names of sheets that start with 'Bulletin Data', for select input on sidebar
+ */
+function getDataSheetNames() {
+  var flowSheetNames = []
+  var sheets = SpreadsheetApp.getActive().getSheets()
+  sheets.forEach(function(sheet){
+    if (/^Bulletin Data/i.test(sheet.getName())) flowSheetNames.push(sheet.getName())
+  })
+  return flowSheetNames
+}

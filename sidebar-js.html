@@ -1,0 +1,154 @@
+<script>
+  // Global variable bulletinData is an object to contain all data needed to perform the 
+  // copy-and-replace action in the app script.
+  var bulletinData = {};
+  
+  /**
+  * Displays an error message within the #result element.
+  *
+  * @param {string} message The error message to display.
+  */
+  function showError(message) {
+    document.getElementById('pickerResult').innerHTML = 'Error: ' + message;
+  }
+  
+  /**
+   * Submit all the form data and create a new bulletin
+   */
+  function submitForm() {
+    getReadings()
+  }
+
+  function getReadings() {
+    // bulletinData was established above as a global variable.
+    bulletinData.fields = {};
+    // Get text of the collect of the day.
+    var collectArray = document.getElementsByClassName("collectText");
+    bulletinData.fields['collect-text'] = collectArray[0].innerHTML;
+    // Get title of the Sunday (e.g. Sixth Sunday in Easter)
+    var sundayTitleArray = document.getElementsByClassName("sundayTitle");
+    bulletinData.fields['sunday-title'] = sundayTitleArray[0].innerHTML;
+    // Get the heading, citation, and text for each reading.
+    var lessons = ['ot','ps','nt','gsp'];
+ 
+    for (var i = 0; i < lessons.length; i++) {
+      var lessonCode = lessons[i];
+      var lessonNumber = document.getElementById(lessonCode + "-select").value;
+      
+      var elementId = lessonCode + lessonNumber;
+     
+      var element = document.getElementById(elementId);
+       
+      if (element.className == "lessonCitation") {
+        // For alternate readings within the same track, the id for the second option is in the lessonCitation element,
+        // and the heading is somewhere up above the first option.  The whole thing is wrapped in an article tag, and
+        // the heading is the first child of the article.
+        var heading = element.parentNode.firstChild.innerHTML;
+        var citationElement = element;
+      } else { // Otherwise, current element is the lesson heading, and the citation follows thereafter.
+        var heading = element.innerHTML;
+        var citationElement = element.nextElementSibling;
+      }
+      bulletinData.fields[lessonCode + '-heading'] = heading;
+      var citation = citationElement.innerHTML;
+      bulletinData.fields[lessonCode + '-citation'] = citation;
+      if (lessonCode == 'gsp') {
+        // Get the name of the evangelist, i.e. book name of gospel citation.
+        bulletinData.fields['gsp-evangelist'] = citation.split(' ',1)[0];
+      }
+      var textElement = citationElement.nextElementSibling;
+      if (lessonCode == 'ps') {
+        // The psalm has an extra sibling, the latin header.
+        var latin = textElement.innerHTML;
+        bulletinData.fields[lessonCode + '-latin'] = latin;
+        textElement = textElement.nextElementSibling;
+      }
+      var text = textElement.innerHTML;
+      bulletinData.fields[lessonCode + '-text'] = text;
+      
+    }
+    copyAndInsert();
+  }
+  
+  function copyAndInsert() {
+    var targetFile = {}
+    targetFile[$('#template-id').val()] = $('#bulletin-file-name').val()
+    bulletinData.targetFiles = targetFile;
+    bulletinData.dataSheetName = $('#data-sheet-select').children("option:selected").val()
+
+    google.script.run
+      .withSuccessHandler(copiedWithSuccess)
+      .withFailureHandler(copiedWithFailure)
+      .copyDocAndWriteReadings(bulletinData);
+  }
+  
+  function copiedWithSuccess(newDocuments) {
+    var success = "<p>Success! New documents were created with readings inserted.</p>";
+    success += "<p>Click here to open the new documents:</p>";
+    for (var i=0; i<newDocuments.length; i++) {
+      var newDocument = newDocuments[i];
+      success += "<p><a href='" + newDocument.url + "'>" + newDocument.name + "</a></p>";
+    }
+    document.getElementById('copyResult').innerHTML = success;
+  }
+  
+  function copiedWithFailure(newDocuments) {
+    document.getElementById('copyResult').innerHTML = "<p>Something went wrong.  You might need to try again.</p>";
+  }
+  
+  // Check if there is more than one reading, e.g. ot1 and ot2; if so, allow user to choose which one.
+  function chooseAlternateReadings() {
+    var lessons = ['ot','ps','nt','gsp'];
+    for (var i = 0; i < lessons.length; i++) {
+      var lessonCode = lessons[i];
+      var lessonNumber = 1;
+      var selectElement = document.getElementById(lessonCode + "-select");
+      selectElement.innerHTML = ''
+      var lessonElement =  document.getElementById(lessonCode + String(lessonNumber));
+      while (lessonElement != null) {
+        // Citations are always tagged h3.  If there are alternates, sometimes the id is attached to the header (The Psalm);
+        // sometimes it's attached directly to the citation (Psalm 30). Check whether the current element is an h3 so we
+        // know which has the citation.
+        var citation = (lessonElement.tagName == "H3") ? lessonElement.innerHTML : lessonElement.nextElementSibling.innerHTML;
+        optionHTML = "<option value='" + lessonNumber + "' >" + citation + "</option>";
+        
+        selectElement.innerHTML += optionHTML;
+        lessonNumber++;
+        lessonElement =  document.getElementById(lessonCode + String(lessonNumber));
+      }
+      
+    }
+    
+    
+    
+  }
+  
+  function writeHtmlOutput(html) {
+    // Load html of lectionary readings into current dialog (hidden) and into sidebar for preview.
+    document.getElementById('mOutput').innerHTML = html;
+    // google.script.run.showInSidebar(html,"Preview of readings");
+    // Allow user to choose among alternate readings.
+    chooseAlternateReadings();
+    hideLoadingSign();
+    
+  }
+  
+  // Fetch the lectionary page url and extract the HTML from it.
+  function getLectionaryHTML(url) {
+    // If no URL, give up:
+    if (url == "") {
+      return;
+    }
+    showLoadingSign()
+    google.script.run
+      .withSuccessHandler(writeHtmlOutput)
+      .withFailureHandler(failureHandler)
+      .getUrlData(url);
+    
+  }
+  
+  function failureHandler(err) {
+    // console.log("failureHandler! " + err.message + '\n' + err.stack)
+  }
+  
+</script>
